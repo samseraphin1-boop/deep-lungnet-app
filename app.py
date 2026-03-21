@@ -17,6 +17,22 @@ st.title("🫁 DeepLungNet")
 st.write("AI-Based Lung Cancer Detection System")
 
 # -----------------------------
+# MODEL EXPLANATION (NEW 🔥)
+# -----------------------------
+st.markdown("""
+### 🧠 Model Explanation
+
+**CNN Model (Image-based):**
+- 🟥 Adenocarcinoma → Cancer (Malignant)
+- 🟥 Squamous Cell Carcinoma → Cancer (Malignant)
+- 🟩 Normal → No Cancer
+
+**ML Model (Clinical Data):**
+- 0 → No Cancer  
+- 1 → Cancer  
+""")
+
+# -----------------------------
 # GOOGLE DRIVE FILE ID
 # -----------------------------
 CNN_ID = "1m_99ziaptnbqhl0vOhLyq9dXMiLtbh-L"
@@ -105,7 +121,12 @@ if option == "Image":
                 probs = torch.softmax(outputs, dim=1)
                 pred = torch.argmax(probs, dim=1).item()
 
-        st.success(f"Prediction: {classes[pred]}")
+        label = classes[pred]
+
+        if label == "Normal":
+            st.success(f"Prediction: {label} (No Cancer)")
+        else:
+            st.error(f"Prediction: {label} (Cancer Detected ⚠️)")
 
         st.subheader("Confidence Scores")
         for i, cls in enumerate(classes):
@@ -126,16 +147,16 @@ if option == "Clinical":
     if st.button("Predict"):
 
         if ml_model is None:
-            st.error("ML model not found!")
+            st.error("⚠️ ML model not loaded! Upload or connect it.")
         else:
             input_data = np.array([[age, smoking, anxiety, fatigue]])
 
             pred = ml_model.predict(input_data)
 
             if pred[0] == 1:
-                st.error("⚠️ High Risk of Lung Cancer")
+                st.error("⚠️ Cancer Detected (ML Output = 1)")
             else:
-                st.success("✅ Low Risk / No Cancer")
+                st.success("✅ No Cancer (ML Output = 0)")
 
 # -----------------------------
 # FOOTER
