@@ -19,16 +19,7 @@ st.markdown("### Hybrid AI Model (CNN + Machine Learning)")
 # -----------------------------
 @st.cache_resource
 def load_cnn():
-    model = models.resnet18(pretrained=False)
-
-    model.fc = nn.Sequential(
-        nn.Linear(model.fc.in_features, 128),
-        nn.ReLU(),
-        nn.Dropout(0.5),
-        nn.Linear(128, 3)
-    )
-
-    model.load_state_dict(torch.load("cnn_lung_model.pth", map_location="cpu"))
+    model = torch.load("cnn_lung_model.pth", map_location="cpu")
     model.eval()
     return model
 
