@@ -18,22 +18,25 @@ st.write("AI-Based Lung Cancer Detection System")
 # -----------------------------
 # GOOGLE DRIVE FILE IDS
 # -----------------------------
-CNN_ID = "YOUR_CNN_FILE_ID"
-ML_ID = "YOUR_ML_FILE_ID"
-SCALER_ID = "YOUR_SCALER_FILE_ID"
+CNN_ID = "1m_99ziaptnbqhl0vOhLyq9dXMiLtbh-L"   # your CNN model
+ML_ID = "YOUR_ML_FILE_ID"  # replace if using ML model from drive
 
 # -----------------------------
-# DOWNLOAD FILES
+# DOWNLOAD FUNCTION
 # -----------------------------
 def download_file(file_id, output):
-    if not os.path.exists(output):
-        url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, output, quiet=False)
+    if file_id != "YOUR_ML_FILE_ID":  # skip empty id
+        if not os.path.exists(output):
+            url = f"https://drive.google.com/uc?id={file_id}"
+            gdown.download(url, output, quiet=False)
 
-# Download models
+# -----------------------------
+# DOWNLOAD MODELS
+# -----------------------------
 download_file(CNN_ID, "cnn_lung_model.pth")
-download_file(ML_ID, "best_ml_model.pkl")
-download_file(SCALER_ID, "scaler.pkl")
+
+# Uncomment if ML model is in drive
+# download_file(ML_ID, "best_ml_model.pkl")
 
 # -----------------------------
 # LOAD CNN MODEL (FULL MODEL)
@@ -47,17 +50,17 @@ def load_cnn():
 cnn_model = load_cnn()
 
 # -----------------------------
-# LOAD ML MODEL + SCALER
+# LOAD ML MODEL (OPTIONAL)
 # -----------------------------
 @st.cache_resource
 def load_ml():
-    with open("best_ml_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
-    return model, scaler
+    try:
+        with open("best_ml_model.pkl", "rb") as f:
+            return pickle.load(f)
+    except:
+        return None
 
-ml_model, scaler = load_ml()
+ml_model = load_ml()
 
 # -----------------------------
 # CLASS LABELS
@@ -116,15 +119,17 @@ if option == "Clinical":
 
     if st.button("Predict"):
 
-        input_data = np.array([[age, smoking, anxiety, fatigue]])
-        input_scaled = scaler.transform(input_data)
-
-        pred = ml_model.predict(input_scaled)
-
-        if pred[0] == 1:
-            st.error("⚠️ High Risk of Lung Cancer")
+        if ml_model is None:
+            st.error("ML model not loaded!")
         else:
-            st.success("✅ Low Risk / No Cancer")
+            input_data = np.array([[age, smoking, anxiety, fatigue]])
+
+            pred = ml_model.predict(input_data)
+
+            if pred[0] == 1:
+                st.error("⚠️ High Risk of Lung Cancer")
+            else:
+                st.success("✅ Low Risk / No Cancer")
 
 # -----------------------------
 # FOOTER
