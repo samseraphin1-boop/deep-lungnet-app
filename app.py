@@ -13,24 +13,9 @@ import os
 # -----------------------------
 st.set_page_config(page_title="DeepLungNet", layout="wide")
 
-st.title("🫁 DeepLungNet")
+st.title("DeepLungNet")
 st.write("AI-Based Lung Cancer Detection System")
 
-# -----------------------------
-# MODEL EXPLANATION (NEW 🔥)
-# -----------------------------
-st.markdown("""
-### 🧠 Model Explanation
-
-**CNN Model (Image-based):**
-- 🟥 Adenocarcinoma → Cancer (Malignant)
-- 🟥 Squamous Cell Carcinoma → Cancer (Malignant)
-- 🟩 Normal → No Cancer
-
-**ML Model (Clinical Data):**
-- 0 → No Cancer  
-- 1 → Cancer  
-""")
 
 # -----------------------------
 # GOOGLE DRIVE FILE ID
