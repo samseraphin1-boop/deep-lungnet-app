@@ -1,6 +1,7 @@
 import streamlit as st
 import torch
-from torchvision import transforms
+import torch.nn as nn
+from torchvision import transforms, models
 from PIL import Image
 import numpy as np
 import pickle
@@ -16,34 +17,39 @@ st.title("🫁 DeepLungNet")
 st.write("AI-Based Lung Cancer Detection System")
 
 # -----------------------------
-# GOOGLE DRIVE FILE IDS
+# GOOGLE DRIVE FILE ID
 # -----------------------------
-CNN_ID = "1m_99ziaptnbqhl0vOhLyq9dXMiLtbh-L"   # your CNN model
-ML_ID = "YOUR_ML_FILE_ID"  # replace if using ML model from drive
+CNN_ID = "1m_99ziaptnbqhl0vOhLyq9dXMiLtbh-L"
 
 # -----------------------------
-# DOWNLOAD FUNCTION
+# DOWNLOAD MODEL
 # -----------------------------
 def download_file(file_id, output):
-    if file_id != "YOUR_ML_FILE_ID":  # skip empty id
-        if not os.path.exists(output):
-            url = f"https://drive.google.com/uc?id={file_id}"
-            gdown.download(url, output, quiet=False)
+    if not os.path.exists(output):
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, output, quiet=False)
 
-# -----------------------------
-# DOWNLOAD MODELS
-# -----------------------------
 download_file(CNN_ID, "cnn_lung_model.pth")
 
-# Uncomment if ML model is in drive
-# download_file(ML_ID, "best_ml_model.pkl")
-
 # -----------------------------
-# LOAD CNN MODEL (FULL MODEL)
+# LOAD CNN MODEL (STATE_DICT FIX)
 # -----------------------------
 @st.cache_resource
 def load_cnn():
-    model = torch.load("cnn_lung_model.pth", map_location="cpu")
+    model = models.resnet18(pretrained=False)
+
+    num_ftrs = model.fc.in_features
+
+    model.fc = nn.Sequential(
+        nn.Linear(num_ftrs, 128),
+        nn.ReLU(),
+        nn.Dropout(0.5),
+        nn.Linear(128, 3)
+    )
+
+    state_dict = torch.load("cnn_lung_model.pth", map_location="cpu")
+    model.load_state_dict(state_dict, strict=False)
+
     model.eval()
     return model
 
@@ -120,7 +126,7 @@ if option == "Clinical":
     if st.button("Predict"):
 
         if ml_model is None:
-            st.error("ML model not loaded!")
+            st.error("ML model not found!")
         else:
             input_data = np.array([[age, smoking, anxiety, fatigue]])
 
@@ -135,4 +141,4 @@ if option == "Clinical":
 # FOOTER
 # -----------------------------
 st.markdown("---")
-st.write("Developed using CNN + ML | Streamlit 🚀")
+st.write("Developed using CNN + Machine Learning | Streamlit 🚀")
