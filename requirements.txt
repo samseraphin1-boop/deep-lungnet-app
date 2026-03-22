@@ -1,7 +1,9 @@
 streamlit
-pandas
-numpy
 scikit-learn
+xgboost
+numpy
+pandas
 torch
 torchvision
 Pillow
+gdown
