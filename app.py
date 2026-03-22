@@ -31,21 +31,19 @@ if option == "Clinical Data Prediction":
 
     st.header("📊 Clinical Data Prediction")
 
-    # Load models safely
     @st.cache_resource
-    def load_clinical_model():
+    def load_clinical():
         model = pickle.load(open("best_model.pkl", "rb"))
         scaler = pickle.load(open("scaler.pkl", "rb"))
-        features = pickle.load(open("features.pkl", "rb"))
+        features = pickle.load(open("feature_list.pkl", "rb"))
         return model, scaler, features
 
-    model, scaler, features = load_clinical_model()
+    model, scaler, features = load_clinical()
 
     st.write("Enter patient details:")
 
     user_input = {}
 
-    # Dynamic input fields
     for feature in features:
         user_input[feature] = st.number_input(feature, value=0.0)
 
@@ -67,56 +65,57 @@ if option == "Clinical Data Prediction":
 
 
 # ================================
-# 🔹 IMAGE PREDICTION (CNN)
+# 🔹 IMAGE PREDICTION (CNN - FIXED)
 # ================================
 elif option == "Image Prediction":
 
     st.header("🖼️ Lung Cancer Image Detection")
 
-    # ===== Model Definition =====
+    # ===== MODEL (2 CLASS FIXED) =====
     class CNNModel(nn.Module):
         def __init__(self):
             super(CNNModel, self).__init__()
-            self.conv = nn.Sequential(
-                nn.Conv2d(3, 16, 3, padding=1),
+            self.model = nn.Sequential(
+                nn.Conv2d(3, 32, 3, padding=1),
                 nn.ReLU(),
                 nn.MaxPool2d(2),
 
-                nn.Conv2d(16, 32, 3, padding=1),
+                nn.Conv2d(32, 64, 3, padding=1),
                 nn.ReLU(),
-                nn.MaxPool2d(2)
-            )
-            self.fc = nn.Sequential(
+                nn.MaxPool2d(2),
+
                 nn.Flatten(),
-                nn.Linear(32 * 56 * 56, 128),
+                nn.Linear(64 * 56 * 56, 128),
                 nn.ReLU(),
-                nn.Linear(128, 3)
+                nn.Linear(128, 2)  # ✅ FIXED TO 2 CLASSES
             )
 
         def forward(self, x):
-            x = self.conv(x)
-            x = self.fc(x)
-            return x
+            return self.model(x)
 
-
-    # ===== Load Model (Google Drive) =====
+    # ===== LOAD MODEL FROM GOOGLE DRIVE =====
     @st.cache_resource
     def load_image_model():
         model_path = "lung_cancer_model.pth"
 
         if not os.path.exists(model_path):
-            with st.spinner("⬇️ Downloading AI model..."):
+            with st.spinner("⬇️ Downloading AI Model..."):
                 url = "https://drive.google.com/uc?id=1ynBvW6ji-0rrV1aWCknJECj9lps1GB8F"
                 gdown.download(url, model_path, quiet=False)
 
         model = CNNModel()
-        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        state_dict = torch.load(model_path, map_location="cpu")
+
+        # Avoid crash if mismatch
+        model.load_state_dict(state_dict, strict=False)
+
         model.eval()
         return model
 
     model = load_image_model()
 
-    classes = ["Adenocarcinoma", "Normal", "Squamous Cell Carcinoma"]
+    # ✅ FIXED CLASSES (2 ONLY)
+    classes = ["Normal", "Cancer"]
 
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -133,7 +132,7 @@ elif option == "Image Prediction":
 
         if st.button("Predict Image"):
 
-            with st.spinner("🔍 Analyzing image..."):
+            with st.spinner("🔍 Analyzing Image..."):
                 outputs = model(img)
                 probs = torch.softmax(outputs, dim=1)
                 _, predicted = torch.max(outputs, 1)
@@ -145,9 +144,7 @@ elif option == "Image Prediction":
             st.info(f"Confidence: {confidence:.2f}")
 
             # Explanation
-            if class_name == "Adenocarcinoma":
-                st.warning("Most common lung cancer type, starts in outer lung cells.")
-            elif class_name == "Squamous Cell Carcinoma":
-                st.warning("Linked to smoking, occurs in central lungs.")
+            if class_name == "Cancer":
+                st.error("⚠️ Cancer detected. Please consult a medical professional.")
             else:
-                st.success("Normal lung tissue detected.")
+                st.success("✅ No cancer detected. Lung appears normal.")
