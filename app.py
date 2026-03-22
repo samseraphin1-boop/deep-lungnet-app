@@ -1,108 +1,136 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
 import pickle
+import numpy as np
+from PIL import Image
 import torch
 import torch.nn as nn
-from torchvision import transforms
-from PIL import Image
+import torchvision.transforms as transforms
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="DEEPLUNGNET", page_icon="🫁", layout="wide")
+# ================================
+# PAGE CONFIG
+# ================================
+st.set_page_config(page_title="Lung Cancer Detection", layout="wide")
 
-# --- VIBRANT CUSTOM CSS ---
-st.markdown("""
-    <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; background-color: #d32f2f; color: white; border-radius: 8px; height: 3em; font-weight: bold; }
-    .stButton>button:hover { background-color: #b71c1c; border: 1px solid white; }
-    h1 { color: #d32f2f; text-align: center; font-family: 'Trebuchet MS'; }
-    .status-box { padding: 20px; border-radius: 10px; text-align: center; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
+st.title("🫁 Lung Cancer Detection System")
+st.write("Choose prediction type from sidebar")
 
-# --- CNN MODEL ARCHITECTURE ---
-class CNN(nn.Module):
-    def __init__(self):
-        super(CNN, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(3, 32, 3), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, 3), nn.ReLU(), nn.MaxPool2d(2)
-        )
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(128 * 26 * 26, 128), nn.ReLU(), nn.Dropout(0.5),
-            nn.Linear(128, 1), nn.Sigmoid()
-        )
-    def forward(self, x):
-        return self.fc(self.conv(x))
+# ================================
+# SIDEBAR
+# ================================
+option = st.sidebar.radio(
+    "Select Mode",
+    ["Clinical Data Prediction", "Image Prediction"]
+)
 
-# --- LOAD ARTIFACTS ---
-@st.cache_resource
-def load_assets():
-    with open('best_model.pkl', 'rb') as f: ml_model = pickle.load(f)
-    with open('scaler.pkl', 'rb') as f: scaler = pickle.load(f)
-    with open('feature_list.pkl', 'rb') as f: features = pickle.load(f)
-    cnn_model = CNN()
-    cnn_model.load_state_dict(torch.load('lung_cancer_model.pth', map_location=torch.device('cpu')))
-    cnn_model.eval()
-    return ml_model, scaler, features, cnn_model
+# ================================
+# ================================
+# 🔹 1. CLINICAL DATA MODEL
+# ================================
+# ================================
+if option == "Clinical Data Prediction":
 
-ml_model, scaler, ml_features, cnn_model = load_assets()
+    st.header("📊 Clinical Data Prediction")
 
-# --- UI LAYOUT ---
-st.markdown("<h1>DEEPLUNGNET: LUNG CANCER ANALYSIS SYSTEM</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Integrating Machine Learning & CNN for Detection and Survival Prediction</p>", unsafe_allow_html=True)
+    # Load model files
+    model = pickle.load(open("best_model.pkl", "rb"))
+    scaler = pickle.load(open("scaler.pkl", "rb"))
+    features = pickle.load(open("features.pkl", "rb"))
 
-tab1, tab2 = st.tabs(["🖼️ CNN Image Detection", "📊 Clinical Survival Prediction"])
+    st.write("Enter patient details:")
 
-with tab1:
-    st.header("CT-Scan Image Classification")
-    up_file = st.file_uploader("Upload Scanning Image (JPG/PNG)", type=["jpg", "png", "jpeg"])
-    if up_file:
-        img = Image.open(up_file).convert('RGB')
-        st.image(img, caption="Target Image", width=400)
-        if st.button("RUN CNN DIAGNOSIS"):
-            transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
-            img_t = transform(img).unsqueeze(0)
-            with torch.no_grad():
-                prob = cnn_model(img_t).item()
-            if prob > 0.5:
-                st.error(f"⚠️ POSITIVE: Lung Cancer Detected (Prob: {prob:.2%})")
-            else:
-                st.success(f"✅ NEGATIVE: No Cancer Detected (Prob: {1-prob:.2%})")
+    user_input = {}
 
-with tab2:
-    st.header("Clinical Outcome Prediction")
-    c1, c2 = st.columns(2)
-    with c1:
-        yrs = st.slider("Years of Smoking", 0, 60, 10)
-        air = st.selectbox("Air Pollution Exposure", ["Low", "Moderate", "High"])
-        pain = st.radio("Chest Pain?", ["No", "Yes"])
-    with c2:
-        stage = st.selectbox("Cancer Stage", ["Stage I", "Stage II", "Stage III", "Stage IV"])
-        treat = st.selectbox("Treatment Type", ["Surgery", "Chemotherapy", "Radiation", "Palliative Care"])
+    # Create inputs dynamically
+    for feature in features:
+        user_input[feature] = st.number_input(feature, value=0.0)
 
-    if st.button("PREDICT SURVIVAL CHANCE"):
-        # Map inputs to model features
-        feat_dict = {f: 0 for f in ml_features}
-        if 'Years_Smoking' in feat_dict: feat_dict['Years_Smoking'] = yrs
-        if air == "Low" and 'Air_Pollution_Exposure_Low' in feat_dict: feat_dict['Air_Pollution_Exposure_Low'] = 1
-        if pain == "Yes" and 'Chest_Pain_Yes' in feat_dict: feat_dict['Chest_Pain_Yes'] = 1
-        if f'Cancer_Stage_{stage}' in feat_dict: feat_dict[f'Cancer_Stage_{stage}'] = 1
-        if f'Treatment_{treat}' in feat_dict: feat_dict[f'Treatment_{treat}'] = 1
-        
-        input_df = pd.DataFrame([feat_dict])[ml_features]
-        scaled_input = scaler.transform(input_df)
-        res = ml_model.predict(scaled_input)[0]
-        prob_surv = ml_model.predict_proba(scaled_input)[0][1]
-        
-        if res == 1:
-            st.success(f"High Survival Probability: {prob_surv:.2%}")
+    input_data = np.array([list(user_input.values())])
+    input_scaled = scaler.transform(input_data)
+
+    if st.button("Predict Clinical Outcome"):
+
+        prediction = model.predict(input_scaled)
+
+        if hasattr(model, "predict_proba"):
+            prob = model.predict_proba(input_scaled)[0][1]
+            st.write(f"🔮 Survival Probability: {prob:.2f}")
+
+        if prediction[0] == 1:
+            st.success("✅ Patient is likely to SURVIVE")
         else:
-            st.warning(f"Moderate/Low Survival Probability: {prob_surv:.2%}")
+            st.error("⚠️ Patient is NOT likely to survive")
 
-st.sidebar.markdown("### Project Info")
-st.sidebar.write("DEEPLUNGNET v1.0")
-st.sidebar.info("This system uses a Hybrid CNN-ML approach for lung cancer screening.")
+
+# ================================
+# ================================
+# 🔹 2. IMAGE MODEL (CNN)
+# ================================
+# ================================
+elif option == "Image Prediction":
+
+    st.header("🖼️ Lung Cancer Image Detection")
+
+    # ===== Define Model (SAME AS TRAINING) =====
+    class CNNModel(nn.Module):
+        def __init__(self):
+            super(CNNModel, self).__init__()
+            self.conv = nn.Sequential(
+                nn.Conv2d(3, 16, 3, padding=1),
+                nn.ReLU(),
+                nn.MaxPool2d(2),
+
+                nn.Conv2d(16, 32, 3, padding=1),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            )
+            self.fc = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(32 * 56 * 56, 128),
+                nn.ReLU(),
+                nn.Linear(128, 3)  # 3 classes
+            )
+
+        def forward(self, x):
+            x = self.conv(x)
+            x = self.fc(x)
+            return x
+
+
+    # Load model
+    model = CNNModel()
+    model.load_state_dict(torch.load("lung_cancer_model.pth", map_location="cpu"))
+    model.eval()
+
+    # Class labels
+    classes = ["Adenocarcinoma", "Normal", "Squamous Cell Carcinoma"]
+
+    # Image transform
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor()
+    ])
+
+    uploaded_file = st.file_uploader("Upload Lung Image", type=["jpg", "png", "jpeg"])
+
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file).convert("RGB")
+        st.image(image, caption="Uploaded Image", use_container_width=True)
+
+        img = transform(image).unsqueeze(0)
+
+        if st.button("Predict Image"):
+
+            outputs = model(img)
+            _, predicted = torch.max(outputs, 1)
+
+            class_name = classes[predicted.item()]
+
+            st.success(f"🧠 Prediction: {class_name}")
+
+            # Explanation
+            if class_name == "Adenocarcinoma":
+                st.warning("Most common lung cancer type, starts in outer lung cells.")
+            elif class_name == "Squamous Cell Carcinoma":
+                st.warning("Linked to smoking, occurs in central lungs.")
+            else:
+                st.success("Normal lung tissue detected.")
