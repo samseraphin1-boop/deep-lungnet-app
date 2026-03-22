@@ -13,7 +13,7 @@ import os
 # ================================
 st.set_page_config(page_title="Lung Cancer Detection", layout="wide")
 
-st.title("🫁 Lung Cancer Detection System")
+st.title("Lung Cancer Detection System")
 st.write("AI-based prediction using Clinical Data & Medical Images")
 
 # ================================
