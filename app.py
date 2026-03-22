@@ -5,6 +5,8 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
+import gdown
+import os
 
 # ================================
 # PAGE CONFIG
@@ -12,35 +14,38 @@ import torchvision.transforms as transforms
 st.set_page_config(page_title="Lung Cancer Detection", layout="wide")
 
 st.title("🫁 Lung Cancer Detection System")
-st.write("Choose prediction type from sidebar")
+st.write("AI-based prediction using Clinical Data & Medical Images")
 
 # ================================
 # SIDEBAR
 # ================================
 option = st.sidebar.radio(
-    "Select Mode",
+    "Select Prediction Mode",
     ["Clinical Data Prediction", "Image Prediction"]
 )
 
 # ================================
-# ================================
-# 🔹 1. CLINICAL DATA MODEL
-# ================================
+# 🔹 CLINICAL DATA PREDICTION
 # ================================
 if option == "Clinical Data Prediction":
 
     st.header("📊 Clinical Data Prediction")
 
-    # Load model files
-    model = pickle.load(open("best_model.pkl", "rb"))
-    scaler = pickle.load(open("scaler.pkl", "rb"))
-    features = pickle.load(open("features.pkl", "rb"))
+    # Load models safely
+    @st.cache_resource
+    def load_clinical_model():
+        model = pickle.load(open("best_model.pkl", "rb"))
+        scaler = pickle.load(open("scaler.pkl", "rb"))
+        features = pickle.load(open("features.pkl", "rb"))
+        return model, scaler, features
+
+    model, scaler, features = load_clinical_model()
 
     st.write("Enter patient details:")
 
     user_input = {}
 
-    # Create inputs dynamically
+    # Dynamic input fields
     for feature in features:
         user_input[feature] = st.number_input(feature, value=0.0)
 
@@ -53,7 +58,7 @@ if option == "Clinical Data Prediction":
 
         if hasattr(model, "predict_proba"):
             prob = model.predict_proba(input_scaled)[0][1]
-            st.write(f"🔮 Survival Probability: {prob:.2f}")
+            st.info(f"🔮 Survival Probability: {prob:.2f}")
 
         if prediction[0] == 1:
             st.success("✅ Patient is likely to SURVIVE")
@@ -62,15 +67,13 @@ if option == "Clinical Data Prediction":
 
 
 # ================================
-# ================================
-# 🔹 2. IMAGE MODEL (CNN)
-# ================================
+# 🔹 IMAGE PREDICTION (CNN)
 # ================================
 elif option == "Image Prediction":
 
     st.header("🖼️ Lung Cancer Image Detection")
 
-    # ===== Define Model (SAME AS TRAINING) =====
+    # ===== Model Definition =====
     class CNNModel(nn.Module):
         def __init__(self):
             super(CNNModel, self).__init__()
@@ -87,7 +90,7 @@ elif option == "Image Prediction":
                 nn.Flatten(),
                 nn.Linear(32 * 56 * 56, 128),
                 nn.ReLU(),
-                nn.Linear(128, 3)  # 3 classes
+                nn.Linear(128, 3)
             )
 
         def forward(self, x):
@@ -96,15 +99,25 @@ elif option == "Image Prediction":
             return x
 
 
-    # Load model
-    model = CNNModel()
-    model.load_state_dict(torch.load("lung_cancer_model.pth", map_location="cpu"))
-    model.eval()
+    # ===== Load Model (Google Drive) =====
+    @st.cache_resource
+    def load_image_model():
+        model_path = "lung_cancer_model.pth"
 
-    # Class labels
+        if not os.path.exists(model_path):
+            with st.spinner("⬇️ Downloading AI model..."):
+                url = "https://drive.google.com/uc?id=1ynBvW6ji-0rrV1aWCknJECj9lps1GB8F"
+                gdown.download(url, model_path, quiet=False)
+
+        model = CNNModel()
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.eval()
+        return model
+
+    model = load_image_model()
+
     classes = ["Adenocarcinoma", "Normal", "Squamous Cell Carcinoma"]
 
-    # Image transform
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor()
@@ -120,12 +133,16 @@ elif option == "Image Prediction":
 
         if st.button("Predict Image"):
 
-            outputs = model(img)
-            _, predicted = torch.max(outputs, 1)
+            with st.spinner("🔍 Analyzing image..."):
+                outputs = model(img)
+                probs = torch.softmax(outputs, dim=1)
+                _, predicted = torch.max(outputs, 1)
 
-            class_name = classes[predicted.item()]
+                class_name = classes[predicted.item()]
+                confidence = probs[0][predicted.item()].item()
 
             st.success(f"🧠 Prediction: {class_name}")
+            st.info(f"Confidence: {confidence:.2f}")
 
             # Explanation
             if class_name == "Adenocarcinoma":
