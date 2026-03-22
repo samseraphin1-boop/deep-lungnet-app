@@ -1,7 +1,7 @@
 streamlit
-torch
-torchvision
-pillow
+pandas
 numpy
 scikit-learn
-gdown
+torch
+torchvision
+Pillow
